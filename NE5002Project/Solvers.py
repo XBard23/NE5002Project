@@ -16,7 +16,7 @@ This is a temporary script file.
 import numpy as np
 
 def jacobi(A, b, xk, iterations):
-    print(f"Method: Jacobi")
+    print("Method: Jacobi")
     n = A.shape[0]
     
     for k in range(iterations):
@@ -46,7 +46,7 @@ xz.append(np.array([1, 1, 1]))
 result = jacobi(A, b, xz, 4)
 
 def gaussSiedel(A, b, xk, iterations):
-    print(f"Method: Gauess Siedel")
+    print("Method: Gauess Siedel")
     n = A.shape[0]
     
     for k in range(iterations):
@@ -75,7 +75,7 @@ xz.append(np.array([1, 1, 1]))
 result = gaussSiedel(A, b, xz, 4)
 
 def SOR(A, b, xk, iterations, w):
-    print(f"Method: SOR")
+    print("Method: SOR")
     n = A.shape[0]
     
     for k in range(iterations):
@@ -110,7 +110,7 @@ def residual(x, A, b):
 
 def PSO(A, b, n_particles=30, n_iterations=500, w=0.5, c1=1.5, c2=1.5):
     n_variables = A.shape[1]
-    print(f"Method: Particle Swarm")
+    print("Method: Particle Swarm")
     
     # Initialize particle positions and velocities
     positions = np.random.uniform(-10, 10, (n_particles, n_variables))
