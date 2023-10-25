@@ -6,12 +6,6 @@ Created on Wed Oct 25 13:45:52 2023
 @author: Xander Bard
 """
 
-# -*- coding: utf-8 -*-
-"""
-Spyder Editor
-
-This is a temporary script file.
-"""
 
 import numpy as np
 
