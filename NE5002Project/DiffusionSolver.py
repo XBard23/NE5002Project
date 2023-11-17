@@ -73,7 +73,8 @@ def mesh(materials):
         xEnd = mat['x-end']
         length = xEnd - xStart
         void = 2*D
-        
+        mat['L'] = L
+        mat['D'] = D
         # Initialize dxy as half the diffusion length
         dxy = L / 2
 
@@ -85,6 +86,8 @@ def mesh(materials):
         while length % dxy > 0.1 * L:
             dxy -= 0.1 * L  # Decrement dxy by 0.1*L until it's a suitable divisor
 
+        mat['dxy'] = dxy
+
         # Extend the mesh for the void boundary only if it's the second material ('m2')
         meshPoints[key] = np.arange(xStart, xEnd, dxy)
         if key == 'm2':
@@ -93,8 +96,8 @@ def mesh(materials):
         xStart = meshPoints[key][-1]
         
 
-        print("dxy = ", dxy)
-        print("L = ", L)
+        #print("dxy = ", dxy)
+        #print("L = ", L)
 
     return meshPoints
 
@@ -173,42 +176,165 @@ Diffusion solver
 """
 
 #Create matrix (then solver)
-def createMatrix(materials):
+def createMatrix(materials, meshMatrix):
     meshPoints = mesh(materials)
     n = len(meshPoints['m1'])
     n += len(meshPoints['m2']) - 1
-    print(n)
-    
-    meshMatrix = matrixCoord(meshPoints)
+    #print(n)
+    matInterface = materials['m1']['x-end']
+    end = materials['m2']['x-end']
     
     matrixA = np.zeros((n, n, n, n))
     
     for i in range(n):
-
+        matrixL = np.zeros((n, n))
+        matrixC = np.zeros((n, n))
+        matrixR = np.zeros((n, n))
         for j in range(n):
             #Get coordinates for this iteration
             x, y = meshMatrix[i, j, 0], meshMatrix[i, j, 1]
-            print("x:", x, "y:", y)
-        
+            #print("x:", x, "y:", y)
+            
+            
+            #call equation components
             
         
     return
 
-#Discretized equation components
+#Discretized equations
+def reflectiveEdge(materials, x, y):
+    matrixL = 0
+    matrixC = np.zeros((1, 3))
+    matrixR = 0
+    m1End = materials['m1']['x-end']
+    m2End = materials['m2']['x-end']
+    D1 = materials['m1']['D']
+    D2 = materials['m2']['D']
+    a1 = materials['m1']['absorption']
+    a2 = materials['m2']['absorption']
+    m1dxy = materials['m1']['dxy']
+    m2dxy = materials['m2']['dxy']
+    aR = 0
+    aL = 0
+    aB = 0
+    aT = 0
+    aC = 0
 
-def reflectiveEdge():
-    pass
+    #Corner of reflective boundary in material 1
+    if x == y: #can do this since we know one needs to be zero to call this function
+        #calculate vairables
+        aR = -D1/2
+        aT = aR
+        aC = a1 - (aR + aT)
+     
+    #matrix interface
+    elif x < m1End and x + m1dxy > m1End or y < m1End and y + m1dxy > m1End:
+        matrixL, matrixC, matrixL = reflectiveInterface(materials, x, D1, D2)
+    
+    #Void and reflective interface corner
+    elif x < m2End and x + m2dxy > m1End or y < m2End and y + m2dxy > m2End:
+        matrixL, matrixC, matrixR = dualBC(materials['m2']['dxy'], D2, a2, x)
+        
+    else:
+        #Left boundary
+        if x == 0:
+            if y < m1End:
+                D = D1
+            else:
+                D = D2
+            
+            aR = -D/2
+            aL = aR
+            aT = -D
+            aB = 0
+            aC = a1 - (aR + aL + aT + aB)
+        
+        #Bottom boundary
+        else:
+            if x < m1End:
+                D = D1
+            else:
+                D = D2
+            aR = -D
+            aL = 0
+            aT = -D/2
+            aB = aT
+            aC = a2 - (aR + aL + aT + aB)
+            
+    matrixL = aB
+    matrixC = [aL, aC, aR]
+    matrixR = aT
+    
+    return matrixL, matrixC, matrixR
+
+def reflectiveInterface(materials, x, D1, D2):
+    
+    matrixL = 0
+    matrixC = np.zeros((1, 3))
+    matrixR = 0
+    
+    m1dxy = materials['m1']['dxy']
+    m2dxy = materials['m2']['dxy']
+    
+    #Left Edge
+    if x == 0:
+        aR = (D1*m1dxy + D2*m2dxy) / ( 2*m1dxy)
+        aB = -D1/2
+        aT = -D2*m1dxy / m2dxy
+        aL = 0
+        aC = a2 - (aR + aL + aT + aB)
+    
+    #Botoom Edge
+    else:
+        pass
+    
+        
+    matrixL = aB
+    matrixC = [aL, aC, aR]
+    matrixR = aT
+    
+    return matrixL, matrixC, matrixR
+    
 
 def voidEdge():
+    
     pass
 
-def dualBC():
+
+def dualBC(dxy, D2, a2, x):
+    matrixL = 0
+    matrixC = np.zeros((1, 3))
+    matrixR = 0
+    
+    #Top left corner
+    if x == 0:   
+        aR = -D2
+        aL = 0
+        aT = -dxy/2
+        aB = aT
+        aC = a2 - (aR + aL + aT + aB)
+    
+    #Bottom right corner
+    else:
+        aR = -dxy/2
+        aL = aR
+        aT = -D2
+        aB = 0
+        aC = a2 - (aR + aL + aT + aB)
+    
+    matrixL = aB
+    matrixC = [aL, aC, aR]
+    matrixR = aT
+    
+    return matrixL, matrixC, matrixR
     pass
 
 def materialEdge():
+    
     pass
 
-def freeSpace():
+def freeSpace(D):
+    
     pass
 
 
@@ -236,10 +362,10 @@ Main
 
 #Get input
 materials = extractInput("Data/input.xlsx")
-meshPoints = mesh(materials)
-print(meshPoints)
-plot_mesh_and_materials(meshPoints, materials)
-createMatrix(materials)
 #Create matrix
-
+meshPoints = mesh(materials)
+plot_mesh_and_materials(meshPoints, materials)
+meshMatrix = matrixCoord(meshPoints)
+createMatrix(materials, meshMatrix)
 #Get output
+print(reflectiveEdge(materials, 0.5, 0))
