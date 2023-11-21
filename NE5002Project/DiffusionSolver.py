@@ -186,26 +186,10 @@ def createMatrix(materials, meshMatrix):
     
     matrixA = np.zeros((n, n, n, n))
     
-    for i in range(n):
-        matrixL = np.zeros((n, n))
-        matrixC = np.zeros((n, n))
-        matrixR = np.zeros((n, n))
-        for j in range(n):
-            #Get coordinates for this iteration
-            x, y = meshMatrix[i, j, 0], meshMatrix[i, j, 1]
-            #print("x:", x, "y:", y)
-            
-            
-            #call equation components
-            
-        
-    return
-
-#Discretized equations
-def reflectiveEdge(materials, x, y):
     matrixL = 0
     matrixC = np.zeros((1, 3))
     matrixR = 0
+    matrixAbsorption = np.zeros((1,n))
     m1End = materials['m1']['x-end']
     m2End = materials['m2']['x-end']
     D1 = materials['m1']['D']
@@ -214,128 +198,94 @@ def reflectiveEdge(materials, x, y):
     a2 = materials['m2']['absorption']
     m1dxy = materials['m1']['dxy']
     m2dxy = materials['m2']['dxy']
-    aR = 0
-    aL = 0
-    aB = 0
-    aT = 0
-    aC = 0
-
-    #Corner of reflective boundary in material 1
-    if x == y: #can do this since we know one needs to be zero to call this function
-        #calculate vairables
-        aR = -D1/2
-        aT = aR
-        aC = a1 - (aR + aT)
-     
-    #matrix interface
-    elif x < m1End and x + m1dxy > m1End or y < m1End and y + m1dxy > m1End:
-        matrixL, matrixC, matrixL = reflectiveInterface(materials, x, D1, D2)
     
-    #Void and reflective interface corner
-    elif x < m2End and x + m2dxy > m1End or y < m2End and y + m2dxy > m2End:
-        matrixL, matrixC, matrixR = dualBC(materials['m2']['dxy'], D2, a2, x)
-        
-    else:
-        #Left boundary
-        if x == 0:
-            if y < m1End:
-                D = D1
-            else:
-                D = D2
+    for i, row in enumerate(meshMatrix):
+    
+        for j, (x, y) in enumerate(row):
+                #print("x:", x, "y:", y)
+                
+                #call equation components
+                #Reflective Boundaries:
+                if y == 0 or x == 0:
+                    #Void:
+                    if x > m2End or y > m2End:
+                        matrixL, matrixC, matrixR = voidBoundary(D2, m2dxy, x, y)
+                    else:    
+                        matrixL, matrixC, matrixR = reflectiveBoundary(D1, D2, m1dxy, m2dxy, x, y)
+                    pass
+                
+                #Free Space:
+                #material 1 but not interface
+                elif x <= m1End - m1dxy and y <= m1End -m1dxy :
+                    matrixL, matrixC, matrixR = freeSpace(D1, D1, m1dxy, m1dxy, x, y)
+                
+                    #material interface:
+                elif x <= m1End  and y <= m1End :
+                    matrixL, matrixC, matrixR = freeSpace(D1, D2, m1dxy, m2dxy, x, y)
+                
+                #Material 2 but not void interface
+                elif x < m2End - m2dxy and y < m2End -m2dxy :
+                    matrixL, matrixC, matrixR = freeSpace(D2, D2, m2dxy, m2dxy, x, y)
+                
+                #Void boundary
+                elif x <= m1End  and y <= m1End :
+                    matrixL, matrixC, matrixR = voidBoundary(D2, m2dxy, x, y)
+                
+                #Extrapolated void distance
+                else: #Fix dxy input
+                    matrixL, matrixC, matrixR = voidBoundary(D2, m2dxy, x, y)
             
-            aR = -D/2
-            aL = aR
-            aT = -D
-            aB = 0
-            aC = a1 - (aR + aL + aT + aB)
         
-        #Bottom boundary
-        else:
-            if x < m1End:
-                D = D1
-            else:
-                D = D2
-            aR = -D
-            aL = 0
-            aT = -D/2
-            aB = aT
-            aC = a2 - (aR + aL + aT + aB)
-            
-    matrixL = aB
-    matrixC = [aL, aC, aR]
-    matrixR = aT
-    
-    return matrixL, matrixC, matrixR
+    return
 
-def reflectiveInterface(materials, x, D1, D2):
-    
+#Descretized Equations
+def reflectiveBoundary(D1, D2, dxy1, dxy2, x, y):
     matrixL = 0
     matrixC = np.zeros((1, 3))
     matrixR = 0
     
-    m1dxy = materials['m1']['dxy']
-    m2dxy = materials['m2']['dxy']
-    
-    #Left Edge
-    if x == 0:
-        aR = (D1*m1dxy + D2*m2dxy) / ( 2*m1dxy)
-        aB = -D1/2
-        aT = -D2*m1dxy / m2dxy
-        aL = 0
-        aC = a2 - (aR + aL + aT + aB)
-    
-    #Botoom Edge
+    if x > y:
+        pass
+    elif x < y:
+        pass
     else:
         pass
     
-        
-    matrixL = aB
-    matrixC = [aL, aC, aR]
-    matrixR = aT
     
     return matrixL, matrixC, matrixR
-    
 
-def voidEdge():
-    
-    pass
-
-
-def dualBC(dxy, D2, a2, x):
+def voidBoundary(D2, dxy2, x, y):
     matrixL = 0
     matrixC = np.zeros((1, 3))
     matrixR = 0
     
-    #Top left corner
-    if x == 0:   
-        aR = -D2
-        aL = 0
-        aT = -dxy/2
-        aB = aT
-        aC = a2 - (aR + aL + aT + aB)
-    
-    #Bottom right corner
+    if x == 0:
+        pass
+    elif y == 0:
+        pass
+    elif x > y:
+        pass
+    elif x < y:
+        pass
     else:
-        aR = -dxy/2
-        aL = aR
-        aT = -D2
-        aB = 0
-        aC = a2 - (aR + aL + aT + aB)
+        pass
     
-    matrixL = aB
-    matrixC = [aL, aC, aR]
-    matrixR = aT
     
     return matrixL, matrixC, matrixR
-    pass
 
-def materialEdge():
+def freeSpace(D1, D2, m1dxy, m2dxy, x, y):
+    matrixL = 0
+    matrixC = np.zeros((1, 3))
+    matrixR = 0
     
-    pass
-
-def freeSpace(D):
+    if x > y:
+        pass
+    elif x < y:
+        pass
+    else:
+        pass
     
-    pass
+    return matrixL, matrixC, matrixR
 
 
 #Build Matrix
@@ -368,4 +318,4 @@ plot_mesh_and_materials(meshPoints, materials)
 meshMatrix = matrixCoord(meshPoints)
 createMatrix(materials, meshMatrix)
 #Get output
-print(reflectiveEdge(materials, 0.5, 0))
+#print(reflectiveEdge(materials, 0.5, 0))
