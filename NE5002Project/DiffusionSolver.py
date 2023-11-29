@@ -186,9 +186,7 @@ def createMatrix(materials, meshMatrix):
     
     matrixA = np.zeros((n, n, n, n))
     
-    matrixL = 0
-    matrixC = np.zeros((1, 3))
-    matrixR = 0
+
     matrixAbsorption = np.zeros((1,n))
     m1End = materials['m1']['x-end']
     m2End = materials['m2']['x-end']
@@ -199,94 +197,26 @@ def createMatrix(materials, meshMatrix):
     m1dxy = materials['m1']['dxy']
     m2dxy = materials['m2']['dxy']
     
-    for i, row in enumerate(meshMatrix):
     
-        for j, (x, y) in enumerate(row):
-                #print("x:", x, "y:", y)
-                
-                #call equation components
-                #Reflective Boundaries:
-                if y == 0 or x == 0:
-                    #Void:
-                    if x > m2End or y > m2End:
-                        matrixL, matrixC, matrixR = voidBoundary(D2, m2dxy, x, y)
-                    else:    
-                        matrixL, matrixC, matrixR = reflectiveBoundary(D1, D2, m1dxy, m2dxy, x, y)
-                    pass
-                
-                #Free Space:
-                #material 1 but not interface
-                elif x <= m1End - m1dxy and y <= m1End -m1dxy :
-                    matrixL, matrixC, matrixR = freeSpace(D1, D1, m1dxy, m1dxy, x, y)
-                
-                    #material interface:
-                elif x <= m1End  and y <= m1End :
-                    matrixL, matrixC, matrixR = freeSpace(D1, D2, m1dxy, m2dxy, x, y)
-                
-                #Material 2 but not void interface
-                elif x < m2End - m2dxy and y < m2End -m2dxy :
-                    matrixL, matrixC, matrixR = freeSpace(D2, D2, m2dxy, m2dxy, x, y)
-                
-                #Void boundary
-                elif x <= m1End  and y <= m1End :
-                    matrixL, matrixC, matrixR = voidBoundary(D2, m2dxy, x, y)
-                
-                #Extrapolated void distance
-                else: #Fix dxy input
-                    matrixL, matrixC, matrixR = voidBoundary(D2, m2dxy, x, y)
-            
+    
+    
+    
+    for i, row in enumerate(meshMatrix):
         
+        for j, (x, y) in enumerate(row):
+     
     return
 
-#Descretized Equations
-def reflectiveBoundary(D1, D2, dxy1, dxy2, x, y):
-    matrixL = 0
-    matrixC = np.zeros((1, 3))
-    matrixR = 0
+#Descretized Equations, These are called when we know where we are and calculate the proper equations
+def descretizedEqs(D00, D10, D01, D11, X0, X1, Y0, Y1):
+    result = [0 if X0 == 0 else -(D00*Y0+D01*Y1)/(2*X0), #Left
+              0 if X1 == 0 else -(D10*Y0+D11*Y1)/(2*X1), #Right
+              0 if Y0 == 0 else -(D00*X0+D10*X1)/(2*Y0), #Bottom
+              0 if Y1 == 0 else -(D01*X0+D11*X1)/(2*Y1), #Top
+              ]
+    result.extend([0.25 * x * y for x in [X0, X1] for y in [Y0, Y1]])
     
-    if x > y:
-        pass
-    elif x < y:
-        pass
-    else:
-        pass
-    
-    
-    return matrixL, matrixC, matrixR
-
-def voidBoundary(D2, dxy2, x, y):
-    matrixL = 0
-    matrixC = np.zeros((1, 3))
-    matrixR = 0
-    
-    if x == 0:
-        pass
-    elif y == 0:
-        pass
-    elif x > y:
-        pass
-    elif x < y:
-        pass
-    else:
-        pass
-    
-    
-    return matrixL, matrixC, matrixR
-
-def freeSpace(D1, D2, m1dxy, m2dxy, x, y):
-    matrixL = 0
-    matrixC = np.zeros((1, 3))
-    matrixR = 0
-    
-    if x > y:
-        pass
-    elif x < y:
-        pass
-    else:
-        pass
-    
-    return matrixL, matrixC, matrixR
-
+    return result
 
 #Build Matrix
 
