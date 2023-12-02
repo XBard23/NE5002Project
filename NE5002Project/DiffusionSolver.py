@@ -171,68 +171,112 @@ def createMatrix(materials, dxy):
     D2 = materials['m2']['D']
     a1 = materials['m1']['absorption']
     a2 = materials['m2']['absorption']
+    S1 = 0
+    S2 = 0
+    E1 = 0
+    E2 = 0
     
     
-    nCalc = (end + 2*D2)/dxy
-    n = math.floor(nCalc)
+    n = int((end + 2*D2)//dxy)
+    x1 = int(m1End//dxy)
+    x2 = n - x1
+    print(n, x1, x2)
 
     matrixA = np.zeros((n*n, n*n))
     matrixAbsorption = np.zeros((1,n))
     
     #Create variables, refer to README.txt for clarification of numbering
     dEqs = {
-        '0': descretizedEqs(0, 0, 0, D1, 0, dxy, 0, dxy),
-        '1': descretizedEqs(0, D1, 0, D1, 0, dxy, dxy, dxy),
-        '2': descretizedEqs(D1, D1, D1, D1, dxy, dxy, dxy, dxy),
-        '3': descretizedEqs(D1, D1, D1, D1, dxy, dxy, dxy, dxy),
-        '4': descretizedEqs(D1, D2, D1, D2, dxy, dxy, dxy, dxy),
-        '5': descretizedEqs(D1, D2, D1, D2, dxy, dxy, dxy, dxy),
-        '6': descretizedEqs(D1, D2, D1, D2, dxy, dxy, dxy, dxy),
-        '7': descretizedEqs(D1, D2, D1, D2, dxy, dxy, dxy, dxy),
-        '8': descretizedEqs(D1, D2, D1, D2, dxy, dxy, dxy, dxy),
-        '9': descretizedEqs(D1, D2, D1, D2, dxy, dxy, dxy, dxy),
+        '0': descretizedEqs(0, 0, 0, D1, 0, dxy, 0, dxy, S1, S1, E1, E1), #Corner
+        '1': descretizedEqs(0, D1, 0, D1, 0, dxy, dxy, dxy, S1, S2, E1, E2), #M1 LR
+        '2': descretizedEqs(D1, D1, D1, D1, dxy, dxy, dxy, dxy, S1, S2, E1, E2), #M1 FS
+        '3': descretizedEqs(D1, D1, D1, D1, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # M1 RR
+        '4': descretizedEqs(0, D1, 0, D2, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # Int LR
+        '5': descretizedEqs(D1, D1, D2, D2, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # Int FS
+        '6': descretizedEqs(D1, D1, D2, D2, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # Int RR
+        '7': descretizedEqs(0, D2, 0, D2, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # M2 LR
+        '8': descretizedEqs(D2, D2, D2, D2, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # M2 Fs
+        '9': descretizedEqs(D2, D2, D2, D2, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # M2 RR
         }
+    
     #adjustments: 
-        #3(Diagnol needs to set Right and bottom to zero)
-        #3( need 1/2 1 and 3 and v2 = 0)
-    y = dxy
+        #3, 6(Diagnol needs to set Right and bottom to zero)
+        #3, 6( need 1/2 1 and 3 and v2 = 0)
+        
+    
+    #Build m2End
+    matrix2 = buildLine(dEqs['7'], dEqs['8'], dEqs['9'], n, x2)
+    
+    matrixA = np.array(matrix2)
+    #Build interface
+    matrixI = buildLine(dEqs['4'], dEqs['5'], dEqs['6'], n, x1)
+    
+    matrixA = np.vstack([matrixI, matrixA])
+    #build m1End
+    matrix1 = buildLine(dEqs['1'], dEqs['2'], dEqs['3'], n, x1)
+    
+    matrixA = np.vstack([matrix1, matrixA])
+    
+    #Assign first row
+    matrix1b = buildLine(dEqs['1'], dEqs['2'], dEqs['3'], n, 2)
+    
+    matrixA = np.vstack([matrix1b, matrixA])
     
     #assign corner
+    matrixC = [0]*(n*n)
+    matrixC[0] = dEqs['0'][4]; matrixC[n] = dEqs['0'][3]
+    matrixA = np.vstack([matrixC, matrixA])
+
     
-    #calculate the rest
-    while y < m2End + 2*D2:
-        #assign x = 0:
-            
-        
-        #assign x = y: 
-            
-        
-        #assign free space: (if statement)
-        
-            
-        y += dxy
+
     
-    
-    
-    
-    #for i, row in enumerate(meshMatrix):
-        
-        #for j, (x, y) in enumerate(row):
+
      
-    return
+    return matrixA
 
 #Descretized Equations, These are called when we know where we are and calculate the proper equations
-def descretizedEqs(D00, D10, D01, D11, X0, X1, Y0, Y1):
+def descretizedEqs(D00, D10, D01, D11, X0, X1, Y0, Y1, S1, S2, E1, E2):
     result = [0 if X0 == 0 else -(D00*Y0+D01*Y1)/(2*X0), #Left
               0 if X1 == 0 else -(D10*Y0+D11*Y1)/(2*X1), #Right
               0 if Y0 == 0 else -(D00*X0+D10*X1)/(2*Y0), #Bottom
               0 if Y1 == 0 else -(D01*X0+D11*X1)/(2*Y1), #Top
               ]
-    result.extend([0.25 * x * y for x in [X0, X1] for y in [Y0, Y1]])
+    
+    V = [0.25 * x * y for x in [X0, X1] for y in [Y0, Y1]]
+    E = V[0]*E1 + V[1]*E2 + V[2]*E1 + V[3]*E2
+    S = V[0]*S1 + V[1]*S2 + V[2]*S1 + V[3]*S2
+    aC = E - sum(result)
+    result.extend([aC, E, S])
     
     return result
 
 #Build Matrix
+def buildLine(t, m, b, n, x):
+    
+    y = 2*n+1
+    n2 = n*n
+    start = n*(x-2)
+   #Build individual matrices:
+    top = [0]*(y)
+    top[0] = t[2]; top[n] = t[4]; top[n+1] = t[1]; top[-1] = t[3]
+    mid = [0]*(y)
+    mid[0] = m[2]; mid[n-1] = m[0]; mid[n] = m[4]; mid[n+1] = m[1]; mid[-1] = t[3]
+    bot = [0]*(y)
+    bot[n-1] = b[0]; bot[n] = b[4]; bot[-1] = t[3]
+    
+   #Build full matrix:
+    matrix = np.zeros((x, n2))
+    matrix[0,start:start+y] = top
+    matrix[-1, start+x-1:start+y+x-1] = bot
+    
+    midCenter = y // 2
+    
+    for i in range(1, x-1):
+        begin = start + i - midCenter + n
+        end = begin + y
+        matrix[i, max(begin, 0):min(end, n2)] = mid[max(-begin,0):y-max(end-n2,0)]
+    
+    return matrix
 
 #Solver
 
@@ -259,6 +303,6 @@ materials = extractInput("Data/input.xlsx")
 #Create matrix
 dxy = mesh(materials)
 plot_mesh_and_materials(dxy, materials)
-createMatrix(materials, dxy)
+matrix = createMatrix(materials, dxy)
 #Get output
 #print(reflectiveEdge(materials, 0.5, 0))
