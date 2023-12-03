@@ -182,7 +182,7 @@ def createMatrix(materials, dxy):
     x2 = n - x1
     print(n, x1, x2)
 
-    matrixA = np.zeros((n*n, n*n))
+    matrixA = np.zeros((n*n//2, n*n//2))
     matrixAbsorption = np.zeros((1,n))
     
     #Create variables, refer to README.txt for clarification of numbering
@@ -205,27 +205,29 @@ def createMatrix(materials, dxy):
         
     
     #Build m2End
-    matrix2 = buildLine(dEqs['7'], dEqs['8'], dEqs['9'], n, x2)
-    
+    matrix2 = buildLine(dEqs['7'], dEqs['8'], dEqs['9'], n, n)
     matrixA = np.array(matrix2)
+    matrixA = iterate(matrixA, matrix2, x2-2, n)
     #Build interface
     matrixI = buildLine(dEqs['4'], dEqs['5'], dEqs['6'], n, x1)
-    
+
+
     matrixA = np.vstack([matrixI, matrixA])
     #build m1End
     matrix1 = buildLine(dEqs['1'], dEqs['2'], dEqs['3'], n, x1)
-    
     matrixA = np.vstack([matrix1, matrixA])
+    matrixA = iterate(matrixA, matrix1, x1-2, 0)
+
     
     #Assign first row
     matrix1b = buildLine(dEqs['1'], dEqs['2'], dEqs['3'], n, 2)
     
-    matrixA = np.vstack([matrix1b, matrixA])
+    #matrixA = np.vstack([matrix1b, matrixA])
     
     #assign corner
     matrixC = [0]*(n*n)
     matrixC[0] = dEqs['0'][4]; matrixC[n] = dEqs['0'][3]
-    matrixA = np.vstack([matrixC, matrixA])
+    #matrixA = np.vstack([matrixC, matrixA])
 
     
 
@@ -254,8 +256,8 @@ def descretizedEqs(D00, D10, D01, D11, X0, X1, Y0, Y1, S1, S2, E1, E2):
 def buildLine(t, m, b, n, x):
     
     y = 2*n+1
-    n2 = n*n
-    start = n*(x-2)
+    n2 = n*(n+1)
+    start = n2-y+1
    #Build individual matrices:
     top = [0]*(y)
     top[0] = t[2]; top[n] = t[4]; top[n+1] = t[1]; top[-1] = t[3]
@@ -266,17 +268,33 @@ def buildLine(t, m, b, n, x):
     
    #Build full matrix:
     matrix = np.zeros((x, n2))
-    matrix[0,start:start+y] = top
-    matrix[-1, start+x-1:start+y+x-1] = bot
+    matrix[0,start-x:start-x+y] = top
+    matrix[-1, start-1:start+y-1] = bot
     
     midCenter = y // 2
     
     for i in range(1, x-1):
-        begin = start + i - midCenter + n
+        begin = start + i-x
         end = begin + y
         matrix[i, max(begin, 0):min(end, n2)] = mid[max(-begin,0):y-max(end-n2,0)]
     
     return matrix
+
+
+def iterate(matrixA, matrix, stop, n):
+    
+    matrix = np.delete(matrix, -2, axis=0)
+    last = np.roll(matrix[-1], -1)
+    matrix[-1] = last
+    matrix = np.hstack([matrix[:, n:], np.zeros((matrix.shape[0], n))])
+    
+    matrixA = np.vstack([matrix, matrixA])
+    
+    if (stop >= 1):
+        matrixA = iterate(matrixA, matrix, stop-1, n)
+ 
+    return matrixA
+        
 
 #Solver
 
