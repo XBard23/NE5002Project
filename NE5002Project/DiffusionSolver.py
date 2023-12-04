@@ -126,7 +126,37 @@ def plot_mesh_and_materials(meshPoints, materials):
     plt.show()
 
 
+def plotResults(matrixA, flux, n, dxy, end):
+    matrix = np.zeros((n, n))
+    index = 0
+    for i in range(n):
+        for j in range(0,i+1):
+            matrix[i, j] = flux[index]
+            index += 1   
+    for i in range(1, n):
+        for j in range(i):
+            matrix[j, i] = matrix[i, j]
+    x, y = np.meshgrid(np.linspace(0, end, n), np.linspace(0, end, n))
 
+    # Create a 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot the surface
+    ax.plot_surface(x, y, matrix, cmap='viridis')
+    ax.set_ylim(ax.get_ylim()[::-1])
+    plt.show()
+    
+    #X plot
+    fig2 = plt.figure()
+    ax2 = fig2.add_subplot(111)
+    ax2.plot(x[0, :], matrix[0, :], color='blue')
+    ax2.set_title("Flux along x-axis at y = 0")
+    ax2.set_xlabel("X")
+    ax2.set_ylabel("Flux")
+    plt.show()
+
+    return
 
 """
 Version data
@@ -158,12 +188,6 @@ def createMatrix(materials, dxy):
     meshPoints = mesh(materials)
     
     #print(n)
-    matInterface = materials['m1']['x-end']
-    end = materials['m2']['x-end']
-    
-
-    
-
 
     m1End = materials['m1']['x-end']
     m2End = materials['m2']['x-end']
@@ -171,70 +195,62 @@ def createMatrix(materials, dxy):
     D2 = materials['m2']['D']
     a1 = materials['m1']['absorption']
     a2 = materials['m2']['absorption']
-    S1 = 0
-    S2 = 0
-    E1 = 0
-    E2 = 0
+    S1 = 10
+    S2 = 10
     
-    
-    n = int((end + 2*D2)//dxy)
+    n = int((m2End + 2*D2)//dxy)
     x1 = int(m1End//dxy)
     x2 = n - x1
     print(n, x1, x2)
 
     matrixA = np.zeros((n*n//2, n*n//2))
-    matrixAbsorption = np.zeros((1,n))
+    sourceVector = []
+    sv = []
     
     #Create variables, refer to README.txt for clarification of numbering
     dEqs = {
-        '0': descretizedEqs(0, 0, 0, D1, 0, dxy, 0, dxy, S1, S1, E1, E1), #Corner
-        '1': descretizedEqs(0, D1, 0, D1, 0, dxy, dxy, dxy, S1, S2, E1, E2), #M1 LR
-        '2': descretizedEqs(D1, D1, D1, D1, dxy, dxy, dxy, dxy, S1, S2, E1, E2), #M1 FS
-        '3': descretizedEqs(D1, D1, D1, D1, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # M1 RR
-        '4': descretizedEqs(0, D1, 0, D2, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # Int LR
-        '5': descretizedEqs(D1, D1, D2, D2, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # Int FS
-        '6': descretizedEqs(D1, D1, D2, D2, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # Int RR
-        '7': descretizedEqs(0, D2, 0, D2, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # M2 LR
-        '8': descretizedEqs(D2, D2, D2, D2, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # M2 Fs
-        '9': descretizedEqs(D2, D2, D2, D2, dxy, dxy, dxy, dxy, S1, S2, E1, E2), # M2 RR
+        '0': descretizedEqs(0, 0, 0, D1, 0, dxy, 0, dxy, S1, S1, a1, a1), #Corner
+        '1': descretizedEqs(0, D1, 0, D1, 0, dxy, dxy, dxy, 0, S1, a1, a1), #M1 LR
+        '2': descretizedEqs(D1, D1, D1, D1, dxy, dxy, dxy, dxy, S1, S1, a1, a1), #M1 FS
+        '3': descretizedEqs(D1, 0, D1, D1, dxy, dxy, dxy, dxy, S1, S1, a1, a1), # M1 RR
+        '4': descretizedEqs(0, D1, 0, D2, dxy, dxy, dxy, dxy, 0, S2, a1, a2), # Int LR
+        '5': descretizedEqs(D1, D1, D2, D2, dxy, dxy, dxy, dxy, S1, S2, a1, a2), # Int FS
+        '6': descretizedEqs(D1, 0, D2, D2, dxy, dxy, dxy, dxy, S1, S2, a1, a2), # Int RR
+        '7': descretizedEqs(0, D2, 0, D2, dxy, dxy, dxy, dxy, 0, S2, a2, a2), # M2 LR
+        '8': descretizedEqs(D2, D2, D2, D2, dxy, dxy, dxy, dxy, S2, S2, a2, a2), # M2 Fs
+        '9': descretizedEqs(D2, 0, D2, D2, dxy, dxy, dxy, dxy, S2, S2, a2, a2), # M2 RR
         }
     
     #adjustments: 
-        #3, 6(Diagnol needs to set Right and bottom to zero)
-        #3, 6( need 1/2 1 and 3 and v2 = 0)
+        #3, 6, 9( need 1/2 1 and 3 and v2 = 0)
         
-    
     #Build m2End
-    matrix2 = buildLine(dEqs['7'], dEqs['8'], dEqs['9'], n, n)
+    matrix2, sv = buildLine2(dEqs['7'], dEqs['8'], dEqs['9'], n, n, 0)
+    sourceVector = np.append(sourceVector, sv)
     matrixA = np.array(matrix2)
-    matrixA = iterate(matrixA, matrix2, x2-2, n)
+    matrixA, sourceVector = iterate(matrixA, matrix2, sourceVector, sv, x2-2, n)
     #Build interface
-    matrixI = buildLine(dEqs['4'], dEqs['5'], dEqs['6'], n, x1)
-
-
+    matrixI, sv = buildLine2(dEqs['4'], dEqs['5'], dEqs['6'], n, x1+1, (x2-1)*n+x2-1)
     matrixA = np.vstack([matrixI, matrixA])
+    sourceVector = np.append(sv, sourceVector)
     #build m1End
-    matrix1 = buildLine(dEqs['1'], dEqs['2'], dEqs['3'], n, x1)
+    matrix1, sv = buildLine2(dEqs['1'], dEqs['2'], dEqs['3'], n, x1, x2*(n+1))
     matrixA = np.vstack([matrix1, matrixA])
-    matrixA = iterate(matrixA, matrix1, x1-2, 0)
-
-    
-    #Assign first row
-    matrix1b = buildLine(dEqs['1'], dEqs['2'], dEqs['3'], n, 2)
-    
-    #matrixA = np.vstack([matrix1b, matrixA])
+    matrixA, sourceVector = iterate(matrixA, matrix1, sourceVector, sv, x1-2, n)
+    sourceVector = np.append(sv, sourceVector)
     
     #assign corner
-    matrixC = [0]*(n*n)
+    matrixC = [0]*(n*(n+1))
     matrixC[0] = dEqs['0'][4]; matrixC[n] = dEqs['0'][3]
-    #matrixA = np.vstack([matrixC, matrixA])
+    matrixA = np.vstack([matrixC, matrixA])
+    sourceVector = np.append(dEqs['0'][6], sourceVector)
 
-    
+    #Condense matrix to square
+    nonZero = ~np.all(matrixA == 0, axis = 0) 
+    matrixA = matrixA[:, nonZero]
+    matrixA = matrixA[:, :-n] 
 
-    
-
-     
-    return matrixA
+    return matrixA, sourceVector, n
 
 #Descretized Equations, These are called when we know where we are and calculate the proper equations
 def descretizedEqs(D00, D10, D01, D11, X0, X1, Y0, Y1, S1, S2, E1, E2):
@@ -243,21 +259,36 @@ def descretizedEqs(D00, D10, D01, D11, X0, X1, Y0, Y1, S1, S2, E1, E2):
               0 if Y0 == 0 else -(D00*X0+D10*X1)/(2*Y0), #Bottom
               0 if Y1 == 0 else -(D01*X0+D11*X1)/(2*Y1), #Top
               ]
-    
+        
     V = [0.25 * x * y for x in [X0, X1] for y in [Y0, Y1]]
+    
+    #Right Reflective adjustment
+    if D10 == 0 and D00 > 0:
+        V[2] = 0
+        V[0] = 0.5 * V[0]
+        V[3] = 0.5*V[3] 
+        result[1] = 0
+    
+    #Corner adjustment
+    if D10 == 0 and D00 == 0:
+        V[3] = 0.5*V[3]
+        
     E = V[0]*E1 + V[1]*E2 + V[2]*E1 + V[3]*E2
     S = V[0]*S1 + V[1]*S2 + V[2]*S1 + V[3]*S2
+    summ = sum(result)
     aC = E - sum(result)
     result.extend([aC, E, S])
     
     return result
 
+
 #Build Matrix
-def buildLine(t, m, b, n, x):
+def buildLine2(t, m, b, n, x, adj):
     
     y = 2*n+1
     n2 = n*(n+1)
-    start = n2-y+1
+    last = n2-adj
+    first = last - y
    #Build individual matrices:
     top = [0]*(y)
     top[0] = t[2]; top[n] = t[4]; top[n+1] = t[1]; top[-1] = t[3]
@@ -266,37 +297,65 @@ def buildLine(t, m, b, n, x):
     bot = [0]*(y)
     bot[n-1] = b[0]; bot[n] = b[4]; bot[-1] = t[3]
     
+   #Build source vector:
+    sourceVector = []
+    
    #Build full matrix:
     matrix = np.zeros((x, n2))
-    matrix[0,start-x:start-x+y] = top
-    matrix[-1, start-1:start+y-1] = bot
+    matrix[0,first-x+1:last-x+1] = top
+    matrix[-1, first:last] = bot
     
-    midCenter = y // 2
+    sourceVector = np.append(t[6], sourceVector)
     
     for i in range(1, x-1):
-        begin = start + i-x
+        begin = first + i - x + 1
         end = begin + y
-        matrix[i, max(begin, 0):min(end, n2)] = mid[max(-begin,0):y-max(end-n2,0)]
+        matrix[i, max(begin, 0):min(end, n2)] = mid
+        sourceVector = np.append(m[6], sourceVector)
+        
+    sourceVector = np.append(b[6], sourceVector)
     
-    return matrix
+    return matrix, sourceVector
 
 
-def iterate(matrixA, matrix, stop, n):
-    
-    matrix = np.delete(matrix, -2, axis=0)
-    last = np.roll(matrix[-1], -1)
-    matrix[-1] = last
-    matrix = np.hstack([matrix[:, n:], np.zeros((matrix.shape[0], n))])
-    
-    matrixA = np.vstack([matrix, matrixA])
-    
-    if (stop >= 1):
-        matrixA = iterate(matrixA, matrix, stop-1, n)
+def iterate(matrixA, matrix, sourceVector, sv, stop, n):
+    while stop >= 1:
+        # Main Matrix adjustments
+        matrix = np.delete(matrix, -2, axis=0)
+        last = np.roll(matrix[-1], -1)
+        matrix[-1] = last
+        matrix = np.hstack([matrix[:, n:], np.zeros((matrix.shape[0], n))])
+
+        matrixA = np.vstack([matrix, matrixA])
+
+        # Source Vector adjustments
+        sv = np.delete(sv, 1)
+        sourceVector = np.append(sv, sourceVector)
+
+        stop -= 1
  
-    return matrixA
+    return matrixA, sourceVector
         
 
-#Solver
+
+"""
+Solver
+"""
+def SOR(A, b, xk, iterations, w):
+    n = A.shape[0]
+    
+    for k in range(iterations):
+        xNew = np.zeros(n)
+        
+        for i in range(n):
+            sum1 = np.dot(A[i, :i], xNew[:i])
+            sum2 = np.dot(A[i, i+1:], xk[-1][i+1:])
+            xNew[i] = (1-w)*xk[-1][i] + w*(b[i] - sum1 - sum2) / A[i, i]
+        
+        xk.append(xNew)
+    
+    return xk[-1]
+
 
 """
 Addiitonal math calls for code readability
@@ -321,6 +380,15 @@ materials = extractInput("Data/input.xlsx")
 #Create matrix
 dxy = mesh(materials)
 plot_mesh_and_materials(dxy, materials)
-matrix = createMatrix(materials, dxy)
+matrixA, source, n = createMatrix(materials, dxy)
+
 #Get output
-#print(reflectiveEdge(materials, 0.5, 0))
+
+flux = np.zeros(matrixA.shape[1])
+guess = [flux]
+
+flux = SOR(matrixA, source, guess, 5000, 1.2)
+
+#Plot results
+plotResults(matrixA, flux, n, dxy, materials['m2']['x-end'])
+
