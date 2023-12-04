@@ -6,13 +6,8 @@ Created on Thu Oct 26 12:17:54 2023
 @author: Xander Bard 
 """
 
-
 """
-Libraries needed:
-Numpy: 
-    
-Matplotlib:
-
+Libraries:
 """
 import numpy as np
 import pandas as pd
@@ -23,8 +18,6 @@ import math
 """
 Timing of methods using decorator functions
 """
-
-
 
 """
 Input data 
@@ -82,7 +75,7 @@ def mesh(materials):
             dxy = length
 
         # Adjust dxy to be the largest divisor of total_length less than or equal to L
-        while length % dxy > 0.1 * L:
+        while length % dxy > 0.4 * L:
             dxy -= 0.1 * L  # Decrement dxy by 0.1*L until it's a suitable divisor
         
         if meshSize == 0 or meshSize > dxy:
@@ -195,8 +188,8 @@ def createMatrix(materials, dxy):
     D2 = materials['m2']['D']
     a1 = materials['m1']['absorption']
     a2 = materials['m2']['absorption']
-    S1 = 10
-    S2 = 10
+    S1 = 0.1
+    S2 = 0
     
     n = int((m2End + 2*D2)//dxy)
     x1 = int(m1End//dxy)
@@ -209,14 +202,14 @@ def createMatrix(materials, dxy):
     
     #Create variables, refer to README.txt for clarification of numbering
     dEqs = {
-        '0': descretizedEqs(0, 0, 0, D1, 0, dxy, 0, dxy, S1, S1, a1, a1), #Corner
-        '1': descretizedEqs(0, D1, 0, D1, 0, dxy, dxy, dxy, 0, S1, a1, a1), #M1 LR
+        '0': descretizedEqs(0, 0, 0, D1, 0, dxy, 0, dxy, 0, S1, 0, a1), #Corner
+        '1': descretizedEqs(0, D1, 0, D1, 0, dxy, dxy, dxy, S1, S1, a1, a1), #M1 LR
         '2': descretizedEqs(D1, D1, D1, D1, dxy, dxy, dxy, dxy, S1, S1, a1, a1), #M1 FS
         '3': descretizedEqs(D1, 0, D1, D1, dxy, dxy, dxy, dxy, S1, S1, a1, a1), # M1 RR
-        '4': descretizedEqs(0, D1, 0, D2, dxy, dxy, dxy, dxy, 0, S2, a1, a2), # Int LR
+        '4': descretizedEqs(0, D1, 0, D2, 0, dxy, dxy, dxy, S1, S2, a1, a2), # Int LR
         '5': descretizedEqs(D1, D1, D2, D2, dxy, dxy, dxy, dxy, S1, S2, a1, a2), # Int FS
         '6': descretizedEqs(D1, 0, D2, D2, dxy, dxy, dxy, dxy, S1, S2, a1, a2), # Int RR
-        '7': descretizedEqs(0, D2, 0, D2, dxy, dxy, dxy, dxy, 0, S2, a2, a2), # M2 LR
+        '7': descretizedEqs(0, D2, 0, D2, 0, dxy, dxy, dxy, S2, S2, a2, a2), # M2 LR
         '8': descretizedEqs(D2, D2, D2, D2, dxy, dxy, dxy, dxy, S2, S2, a2, a2), # M2 Fs
         '9': descretizedEqs(D2, 0, D2, D2, dxy, dxy, dxy, dxy, S2, S2, a2, a2), # M2 RR
         }
@@ -261,22 +254,25 @@ def descretizedEqs(D00, D10, D01, D11, X0, X1, Y0, Y1, S1, S2, E1, E2):
               ]
         
     V = [0.25 * x * y for x in [X0, X1] for y in [Y0, Y1]]
-    
+    aC = 0
     #Right Reflective adjustment
     if D10 == 0 and D00 > 0:
         V[2] = 0
         V[0] = 0.5 * V[0]
-        V[3] = 0.5*V[3] 
-        result[1] = 0
+        V[3] = 0.5 * V[3] 
+        result[1] = 0; result[2] = 0
+        
     
     #Corner adjustment
     if D10 == 0 and D00 == 0:
-        V[3] = 0.5*V[3]
+        V[3] = 0.25*V[3]
+        result[1] = 0
+        
+    
         
     E = V[0]*E1 + V[1]*E2 + V[2]*E1 + V[3]*E2
     S = V[0]*S1 + V[1]*S2 + V[2]*S1 + V[3]*S2
-    summ = sum(result)
-    aC = E - sum(result)
+    aC += E - sum(result)
     result.extend([aC, E, S])
     
     return result
@@ -293,9 +289,9 @@ def buildLine2(t, m, b, n, x, adj):
     top = [0]*(y)
     top[0] = t[2]; top[n] = t[4]; top[n+1] = t[1]; top[-1] = t[3]
     mid = [0]*(y)
-    mid[0] = m[2]; mid[n-1] = m[0]; mid[n] = m[4]; mid[n+1] = m[1]; mid[-1] = t[3]
+    mid[0] = m[2]; mid[n-1] = m[0]; mid[n] = m[4]; mid[n+1] = m[1]; mid[-1] = m[3]
     bot = [0]*(y)
-    bot[n-1] = b[0]; bot[n] = b[4]; bot[-1] = t[3]
+    bot[n-1] = b[0]; bot[n] = b[4]; bot[-1] = b[3]
     
    #Build source vector:
     sourceVector = []
