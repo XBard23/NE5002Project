@@ -72,7 +72,7 @@ def mesh(materials):
 
         # Check if dxy is too large for the material's length
         if dxy > length:
-            dxy = length
+            dxy = length//2
 
         # Adjust dxy to be the largest divisor of total_length less than or equal to L
         while length % dxy > 0.4 * L:
@@ -86,37 +86,47 @@ def mesh(materials):
     return meshSize
 
 
-#Take out of final code
 def plot_mesh_and_materials(meshPoints, materials):
     # Set up the figure and axis
     fig, ax = plt.subplots(figsize=(10, 10))
-    
+
     # Define variables for the total x extent
     total_xEnd = max(material['x-end'] for material in materials.values())
 
-    # Plot the boundaries and mesh for each material
+    # Plot the boundaries and mesh for each material in the first quadrant
     previous_xEnd = 0
     for key, material in materials.items():
         xEnd = material['x-end']
 
-        # Plot the boundary for the material
-        ax.plot([previous_xEnd, xEnd, xEnd, previous_xEnd, previous_xEnd], [0, 0, xEnd, xEnd, 0], color='black', linewidth=2)
-        
+        # Vertical line
+        ax.plot([xEnd, xEnd], [0, xEnd], color='black', linewidth=2)  # Vertical line
+
+        # Horizontal line for material 1
+        if key == 'm1':
+            ax.plot([previous_xEnd, xEnd], [xEnd, xEnd], color='black', linewidth=2)
+
         previous_xEnd = xEnd
 
+    # Extend the material 1 boundary to form a larger square
+    m1_xEnd = materials['m1']['x-end']
+    ax.plot([-m1_xEnd, m1_xEnd], [m1_xEnd, m1_xEnd], color='black', linewidth=2)  # Top horizontal line
+    ax.plot([-m1_xEnd, -m1_xEnd], [-m1_xEnd, m1_xEnd], color='black', linewidth=2)  # Left vertical line
+    ax.plot([-m1_xEnd, m1_xEnd], [-m1_xEnd, -m1_xEnd], color='black', linewidth=2)  # Bottom horizontal line
+    ax.plot([m1_xEnd, m1_xEnd], [-m1_xEnd, m1_xEnd], color='black', linewidth=2)  # Right vertical line
+
     # Overlay the mesh points as a lighter grid within the entire area
-    x = meshPoints
-    while x <= total_xEnd:
+    for x in np.arange(-total_xEnd, total_xEnd + meshPoints, meshPoints):
         ax.axvline(x, color='lightblue', linestyle='--', linewidth=0.5)
         ax.axhline(x, color='lightblue', linestyle='--', linewidth=0.5)
-        x += meshPoints
 
-    ax.set_xlim(0, total_xEnd)
-    ax.set_ylim(0, total_xEnd)
+    ax.set_xlim(-total_xEnd, total_xEnd)
+    ax.set_ylim(-total_xEnd, total_xEnd)
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_title('Mesh and Materials Visualization')
     plt.show()
+
+
 
 
 def plotResults(matrixA, flux, n, dxy, end):
@@ -143,10 +153,20 @@ def plotResults(matrixA, flux, n, dxy, end):
     #X plot
     fig2 = plt.figure()
     ax2 = fig2.add_subplot(111)
-    ax2.plot(x[0, :], matrix[0, :], color='blue')
+    ax2.plot(x[2, :], matrix[2, :], color='blue')
     ax2.set_title("Flux along x-axis at y = 0")
     ax2.set_xlabel("X")
     ax2.set_ylabel("Flux")
+    plt.show()
+    
+    #y=x diagonal
+    fig3 = plt.figure()
+    ax3 = fig3.add_subplot(111)
+    diagonal_values = np.array([matrix[i, i] for i in range(n)])
+    ax3.plot(x[0, :], diagonal_values, color='green')
+    ax3.set_title("Flux along y = x")
+    ax3.set_xlabel("y = x")
+    ax3.set_ylabel("Flux")
     plt.show()
 
     return
@@ -178,23 +198,18 @@ Diffusion solver
 
 #Create matrix (then solver)
 def createMatrix(materials, dxy):
-    meshPoints = mesh(materials)
-    
-    #print(n)
-
     m1End = materials['m1']['x-end']
     m2End = materials['m2']['x-end']
     D1 = materials['m1']['D']
     D2 = materials['m2']['D']
     a1 = materials['m1']['absorption']
     a2 = materials['m2']['absorption']
-    S1 = 0.1
-    S2 = 0
+    S1 = 5
+    S2 = 5
     
     n = int((m2End + 2*D2)//dxy)
     x1 = int(m1End//dxy)
     x2 = n - x1
-    print(n, x1, x2)
 
     matrixA = np.zeros((n*n//2, n*n//2))
     sourceVector = []
@@ -227,10 +242,11 @@ def createMatrix(materials, dxy):
     matrixA = np.vstack([matrixI, matrixA])
     sourceVector = np.append(sv, sourceVector)
     #build m1End
-    matrix1, sv = buildLine2(dEqs['1'], dEqs['2'], dEqs['3'], n, x1, x2*(n+1))
-    matrixA = np.vstack([matrix1, matrixA])
-    matrixA, sourceVector = iterate(matrixA, matrix1, sourceVector, sv, x1-2, n)
-    sourceVector = np.append(sv, sourceVector)
+    if x1 > 1:
+        matrix1, sv = buildLine2(dEqs['1'], dEqs['2'], dEqs['3'], n, x1, x2*(n+1))
+        matrixA = np.vstack([matrix1, matrixA])
+        matrixA, sourceVector = iterate(matrixA, matrix1, sourceVector, sv, x1-2, n)
+        sourceVector = np.append(sv, sourceVector)
     
     #assign corner
     matrixC = [0]*(n*(n+1))
@@ -245,7 +261,7 @@ def createMatrix(materials, dxy):
 
     return matrixA, sourceVector, n
 
-#Descretized Equations, These are called when we know where we are and calculate the proper equations
+#Descretized Equations
 def descretizedEqs(D00, D10, D01, D11, X0, X1, Y0, Y1, S1, S2, E1, E2):
     result = [0 if X0 == 0 else -(D00*Y0+D01*Y1)/(2*X0), #Left
               0 if X1 == 0 else -(D10*Y0+D11*Y1)/(2*X1), #Right
@@ -255,21 +271,20 @@ def descretizedEqs(D00, D10, D01, D11, X0, X1, Y0, Y1, S1, S2, E1, E2):
         
     V = [0.25 * x * y for x in [X0, X1] for y in [Y0, Y1]]
     aC = 0
+    
     #Right Reflective adjustment
     if D10 == 0 and D00 > 0:
         V[2] = 0
         V[0] = 0.5 * V[0]
         V[3] = 0.5 * V[3] 
         result[1] = 0; result[2] = 0
-        
     
     #Corner adjustment
     if D10 == 0 and D00 == 0:
-        V[3] = 0.25*V[3]
+        V[3] = 0.5*V[3]
         result[1] = 0
         
-    
-        
+    #Calculate aC and source
     E = V[0]*E1 + V[1]*E2 + V[2]*E1 + V[3]*E2
     S = V[0]*S1 + V[1]*S2 + V[2]*S1 + V[3]*S2
     aC += E - sum(result)
@@ -337,18 +352,25 @@ def iterate(matrixA, matrix, sourceVector, sv, stop, n):
 """
 Solver
 """
-def SOR(A, b, xk, iterations, w):
+def SOR(A, b, xk, w, tol):
     n = A.shape[0]
+    xNew = np.zeros(n)
     
-    for k in range(iterations):
-        xNew = np.zeros(n)
+    while True:
+        xOld = xNew.copy()
         
         for i in range(n):
             sum1 = np.dot(A[i, :i], xNew[:i])
-            sum2 = np.dot(A[i, i+1:], xk[-1][i+1:])
-            xNew[i] = (1-w)*xk[-1][i] + w*(b[i] - sum1 - sum2) / A[i, i]
+            sum2 = np.dot(A[i, i+1:], xOld[i+1:])
+            xNew[i] = (1-w)*xOld[i] + w*(b[i] - sum1 - sum2) / A[i, i]
         
-        xk.append(xNew)
+        xk.append(xNew.copy())
+
+        # Calculate relative error
+        relError = np.linalg.norm(xNew - xOld) / np.linalg.norm(xNew)
+        print(relError)
+        if relError < tol:
+            break
     
     return xk[-1]
 
@@ -375,7 +397,7 @@ Main
 materials = extractInput("Data/input.xlsx")
 #Create matrix
 dxy = mesh(materials)
-plot_mesh_and_materials(dxy, materials)
+#plot_mesh_and_materials(dxy, materials)
 matrixA, source, n = createMatrix(materials, dxy)
 
 #Get output
@@ -383,7 +405,7 @@ matrixA, source, n = createMatrix(materials, dxy)
 flux = np.zeros(matrixA.shape[1])
 guess = [flux]
 
-flux = SOR(matrixA, source, guess, 5000, 1.2)
+flux = SOR(matrixA, source, guess, 5/4, 1e-4)
 
 #Plot results
 plotResults(matrixA, flux, n, dxy, materials['m2']['x-end'])
